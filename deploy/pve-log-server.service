@@ -1,0 +1,14 @@
+[Unit]
+Description=PVE Log Server (nhan log tran dau, ghi CSV, import MySQL)
+After=network.target mysql.service
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/pve-log-server
+ExecStart=/usr/bin/java -jar /opt/pve-log-server/pve-log-server.jar
+Restart=always
+RestartSec=5
+User=pvelogserver
+
+[Install]
+WantedBy=multi-user.target

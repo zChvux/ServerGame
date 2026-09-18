@@ -1,0 +1,17 @@
+# Maven build output - khong can luu, ai clone ve tu build lai duoc
+target/
+
+# File .class bien dich rieng le (neu co)
+*.class
+
+# Log that sinh ra khi chay server - khong nen public du lieu nguoi choi
+logs/
+
+# File cau hinh chua mat khau MySQL that - KHONG duoc push len GitHub
+src/main/resources/application.properties
+
+# File/folder cua IDE
+.idea/
+*.iml
+.vscode/
+.DS_Store
