@@ -119,6 +119,7 @@ java -jar target/pve-log-server-jar-with-dependencies.jar
 cd test-client
 javac SendLogTestClient.java
 java SendLogTestClient localhost 9000 /duong/dan/toi/2026-08-06_15-46-15.csv
+ex: java SendLogTestClient localhost 9000 "D:/DoAnTotNghiep/pve-log-server/test-client/2026-08-06_15-46-15.csv"
 ```
 
 Kết quả mong đợi:
@@ -136,13 +137,14 @@ Kết quả mong đợi:
 ### Test nhiều kết nối đồng thời (để kiểm tra đúng yêu cầu ~20 socket)
 
 Chạy nhiều lần `SendLogTestClient` song song (khác `match_id` để không trùng),
-ví dụ bằng vòng lặp bash:
-
 ```bash
-for i in $(seq 1 20); do
-  java SendLogTestClient localhost 9000 /duong/dan/toi/2026-08-06_15-46-15.csv "test_match_$i" &
-done
-wait
+# Terminal 1: chạy server (đã làm ở bước 4)
+java -jar target/pve-log-server-jar-with-dependencies.jar
+
+# Terminal 2: build và chạy client test
+cd test-client
+javac ConcurrentLoadTest.java
+java ConcurrentLoadTest localhost 9000 "D:\DoAnTotNghiep\pve-log-server\test-client\2026-08-06_15-46-15.csv" 20
 ```
 
 Nếu tất cả đều nhận được `OK` và MySQL có đủ 20 `match_id` khác nhau trong
@@ -159,3 +161,6 @@ bảng `matches` — server đã đáp ứng đúng yêu cầu xử lý đồng 
   có thể thêm `Semaphore` để kiểm soát rõ ràng hơn.
 - **TLS**: nếu log chứa thông tin nhạy cảm và gửi qua mạng công cộng, nên bọc
   `SSLServerSocket` thay vì `ServerSocket` thường.
+
+
+

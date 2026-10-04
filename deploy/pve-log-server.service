@@ -5,10 +5,10 @@ After=network.target mysql.service
 [Service]
 Type=simple
 WorkingDirectory=/opt/pve-log-server
-ExecStart=/usr/bin/java -jar /opt/pve-log-server/pve-log-server.jar
+ExecStart=/usr/bin/java -jar /opt/pve-log-server/pve-log-server-jar-with-dependencies.jar
 Restart=always
 RestartSec=5
-User=pvelogserver
+User=root
 
 [Install]
 WantedBy=multi-user.target
