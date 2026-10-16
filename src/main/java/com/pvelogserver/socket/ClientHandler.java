@@ -39,7 +39,7 @@ public class ClientHandler implements Runnable {
 
     // Gioi han do dai match_id va kich thuoc 1 tran gui len,
     // tranh client loi/gian lan gui du lieu qua lon
-    private static final int MAX_MATCH_ID_BYTES = 256;
+    private static final int MAX_MATCH_ID_BYTES = 64; // khop cot match_id VARCHAR(64) trong DB
     private static final int MAX_PAYLOAD_BYTES = 10 * 1024 * 1024; // 10 MB
 
     private final Socket socket;

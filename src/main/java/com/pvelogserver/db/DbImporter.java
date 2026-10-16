@@ -40,6 +40,10 @@ public class DbImporter {
     private static final String SELECT_MATCH_SQL =
             "SELECT 1 FROM matches WHERE match_id = ?";
 
+    // Dung cho PendingImportJob: file nay da duoc nhap chua? (theo match_id HOAC theo duong dan file)
+    private static final String SELECT_IMPORTED_SQL =
+            "SELECT 1 FROM matches WHERE match_id = ? OR csv_file_path = ? LIMIT 1";
+
     // Khong dung INSERT IGNORE: can MySQL bao loi khi trung de biet ma bo qua import events
     private static final String INSERT_MATCH_SQL =
             "INSERT INTO matches (match_id, csv_file_path) VALUES (?, ?)";
@@ -53,6 +57,7 @@ public class DbImporter {
 
     /** Bao hieu tran nay da duoc import truoc do (khong phai loi he thong). */
     public static class DuplicateMatchException extends Exception {
+        private static final long serialVersionUID = 1L;
         public DuplicateMatchException(String matchId) {
             super("Tran '" + matchId + "' da ton tai trong DB");
         }
@@ -65,6 +70,23 @@ public class DbImporter {
              PreparedStatement stmt = conn.prepareStatement(SELECT_MATCH_SQL)) {
 
             stmt.setString(1, matchId);
+            try (ResultSet rs = stmt.executeQuery()) {
+                return rs.next();
+            }
+        }
+    }
+
+    /**
+     * Tran nay (hoac chinh file CSV nay) da duoc nhap vao DB chua?
+     * Kiem tra ca duong dan file de khong nhap lai 1 file da nhap duoi match_id khac.
+     */
+    public static boolean isAlreadyImported(String matchId, String csvFilePath) throws Exception {
+        try (Connection conn = DriverManager.getConnection(
+                DbConfig.getUrl(), DbConfig.getUser(), DbConfig.getPassword());
+             PreparedStatement stmt = conn.prepareStatement(SELECT_IMPORTED_SQL)) {
+
+            stmt.setString(1, matchId);
+            stmt.setString(2, csvFilePath);
             try (ResultSet rs = stmt.executeQuery()) {
                 return rs.next();
             }

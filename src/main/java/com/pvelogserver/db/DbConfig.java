@@ -62,4 +62,25 @@ public class DbConfig {
     public static int getMaxConcurrentClients() {
         return Integer.parseInt(props.getProperty("server.maxConcurrentClients", "20"));
     }
+
+    // ---- Job tu nhap lai file CSV chua vao DB (tat ca TUY CHON, co mac dinh) ----
+
+    public static boolean isRetryJobEnabled() {
+        return Boolean.parseBoolean(props.getProperty("import.retry.enabled", "true"));
+    }
+
+    /** Doi bao nhieu giay sau khi server khoi dong thi chay lan dau (cho MySQL kip len). */
+    public static int getRetryInitialDelaySeconds() {
+        return Integer.parseInt(props.getProperty("import.retry.initialDelaySeconds", "30"));
+    }
+
+    /** Chu ky lap lai (giay). Mac dinh 600 = 10 phut. */
+    public static int getRetryIntervalSeconds() {
+        return Integer.parseInt(props.getProperty("import.retry.intervalSeconds", "600"));
+    }
+
+    /** Bo qua file moi hon so giay nay (tranh dung do voi ClientHandler dang import file do). */
+    public static int getRetryMinAgeSeconds() {
+        return Integer.parseInt(props.getProperty("import.retry.minAgeSeconds", "60"));
+    }
 }

@@ -11,7 +11,7 @@ import java.util.UUID;
  * truoc khi thu import vao MySQL. Neu MySQL loi, file nay van con nguyen.
  */
 public class CsvLogWriter {
-    private static final String LOG_DIR = "logs/matches";
+    public static final String LOG_DIR = "logs/matches";
 
     /**
      * @param matchId id tran do client gui len (vd ten file goc Core xuat ra,
