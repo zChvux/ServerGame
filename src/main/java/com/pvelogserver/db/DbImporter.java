@@ -6,6 +6,8 @@ import java.io.FileReader;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.util.logging.Logger;
 
 /**
@@ -18,15 +20,29 @@ import java.util.logging.Logger;
  *   186,1306,500.44,Spike,1850,265,None
  *
  * Luu y: file CSV goc KHONG chua match_id (Core hien tai la single-match, chua
- * co khai niem nhieu tran chay song song). match_id o day duoc server gan tu
- * ben ngoai (client gui kem qua giao thuc socket - xem ClientHandler), khong
- * doc tu ben trong noi dung CSV.
+ * co khai niem nhieu tran chay song song). match_id o day duoc client gui kem
+ * qua giao thuc socket (xem ClientHandler), khong doc tu ben trong noi dung CSV.
+ *
+ * CHONG NHAP TRUNG: moi match_id chi duoc import dung 1 lan.
+ *   - matchExists(): kiem tra nhanh truoc khi luu file / import (truong hop thuong gap:
+ *     client retry gui lai 1 tran da gui thanh cong).
+ *   - Bang matches co PRIMARY KEY (match_id): neu 2 lan gui den DUNG CUNG LUC
+ *     va deu vuot qua buoc kiem tra tren, lan den sau se bi MySQL tu choi (loi 1062)
+ *     -> nem DuplicateMatchException, transaction duoc rollback, khong co dong
+ *     nao trong match_events bi chen trung.
  */
 public class DbImporter {
     private static final Logger LOGGER = Logger.getLogger(DbImporter.class.getName());
 
+    // Ma loi cua MySQL cho "Duplicate entry ... for key ..."
+    private static final int MYSQL_ERR_DUPLICATE_ENTRY = 1062;
+
+    private static final String SELECT_MATCH_SQL =
+            "SELECT 1 FROM matches WHERE match_id = ?";
+
+    // Khong dung INSERT IGNORE: can MySQL bao loi khi trung de biet ma bo qua import events
     private static final String INSERT_MATCH_SQL =
-            "INSERT IGNORE INTO matches (match_id, csv_file_path) VALUES (?, ?)";
+            "INSERT INTO matches (match_id, csv_file_path) VALUES (?, ?)";
 
     private static final String INSERT_EVENT_SQL =
             "INSERT INTO match_events " +
@@ -34,6 +50,26 @@ public class DbImporter {
             "VALUES (?, ?, ?, ?, ?, ?, ?, ?)";
 
     private static final int BATCH_SIZE = 500;
+
+    /** Bao hieu tran nay da duoc import truoc do (khong phai loi he thong). */
+    public static class DuplicateMatchException extends Exception {
+        public DuplicateMatchException(String matchId) {
+            super("Tran '" + matchId + "' da ton tai trong DB");
+        }
+    }
+
+    /** Kiem tra match_id da co trong bang matches chua. Nem exception neu khong ket noi duoc DB. */
+    public static boolean matchExists(String matchId) throws Exception {
+        try (Connection conn = DriverManager.getConnection(
+                DbConfig.getUrl(), DbConfig.getUser(), DbConfig.getPassword());
+             PreparedStatement stmt = conn.prepareStatement(SELECT_MATCH_SQL)) {
+
+            stmt.setString(1, matchId);
+            try (ResultSet rs = stmt.executeQuery()) {
+                return rs.next();
+            }
+        }
+    }
 
     public static void importCsvFile(String matchId, String csvFilePath) throws Exception {
         try (Connection conn = DriverManager.getConnection(
@@ -51,7 +87,14 @@ public class DbImporter {
 
                 matchStmt.setString(1, matchId);
                 matchStmt.setString(2, csvFilePath);
-                matchStmt.executeUpdate();
+                try {
+                    matchStmt.executeUpdate();
+                } catch (SQLException e) {
+                    if (e.getErrorCode() == MYSQL_ERR_DUPLICATE_ENTRY) {
+                        throw new DuplicateMatchException(matchId);
+                    }
+                    throw e;
+                }
 
                 String[] row;
                 while ((row = reader.readNext()) != null) {
@@ -81,6 +124,8 @@ public class DbImporter {
             conn.commit();
             LOGGER.info("Import thanh cong tran " + matchId + " (" + rowCount + " dong) tu " + csvFilePath);
 
+        } catch (DuplicateMatchException e) {
+            throw e; // giu nguyen de ClientHandler phan biet voi loi DB that su
         } catch (Exception e) {
             throw new Exception("Loi import CSV vao DB: " + csvFilePath, e);
         }

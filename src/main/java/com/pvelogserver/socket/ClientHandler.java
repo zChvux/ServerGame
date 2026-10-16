@@ -26,8 +26,13 @@ import java.util.logging.Logger;
  * Client can tu sinh 1 id duy nhat cho moi tran (vi du dung timestamp luc
  * bat dau tran) va gui kem, thay vi server phai doan/tu sinh.
  *
- * Sau khi gui xong, client co the doc 1 dong phan hoi ("OK" / "OK_CSV_ONLY" /
- * "ERROR ...") roi dong ket noi.
+ * Sau khi gui xong, client co the doc 1 dong phan hoi roi dong ket noi:
+ *   "OK"            - da luu CSV va import DB thanh cong
+ *   "OK_DUPLICATE"  - tran nay (match_id) DA duoc nhan truoc do, khong import lai
+ *   "OK_CSV_ONLY"   - da luu CSV an toan nhung import DB loi
+ *   "ERROR ..."     - du lieu gui len khong hop le
+ * Quy uoc cho client: moi phan hoi BAT DAU bang "OK" deu coi la server da nhan
+ * duoc tran nay -> co the danh dau file la "da gui", khong can gui lai.
  */
 public class ClientHandler implements Runnable {
     private static final Logger LOGGER = Logger.getLogger(ClientHandler.class.getName());
@@ -67,12 +72,33 @@ public class ClientHandler implements Runnable {
             in.readFully(payload);
             String csvContent = new String(payload, StandardCharsets.UTF_8);
 
+            // Chong nhap trung: neu tran nay da co trong DB (vd client retry gui lai
+            // sau khi lan truoc da thanh cong nhung mat ket noi luc cho phan hoi)
+            // thi khong luu them file CSV, khong import lai, bao cho client biet da nhan roi.
+            boolean alreadyExists = false;
+            try {
+                alreadyExists = DbImporter.matchExists(matchId);
+            } catch (Exception checkEx) {
+                // Khong kiem tra duoc (DB loi) -> khong chan, cu luu CSV de khong mat du lieu
+                LOGGER.log(Level.WARNING, "Khong kiem tra duoc tran da ton tai (DB loi?), tiep tuc luu CSV", checkEx);
+            }
+            if (alreadyExists) {
+                LOGGER.info("Tran '" + matchId + "' da ton tai trong DB (gui trung tu " + remote + "), bo qua");
+                sendResponse(out, "OK_DUPLICATE");
+                return;
+            }
+
             String savedFilePath = CsvLogWriter.saveMatchCsv(matchId, csvContent);
             LOGGER.info("Da luu log tran '" + matchId + "' tu " + remote + " -> " + savedFilePath);
 
             try {
                 DbImporter.importCsvFile(matchId, savedFilePath);
                 sendResponse(out, "OK");
+            } catch (DbImporter.DuplicateMatchException dupEx) {
+                // 2 lan gui den gan nhu cung luc, lan kia da import xong truoc.
+                // (File CSV vua luu o tren la ban trung - hiem khi xay ra, co the xoa tay)
+                LOGGER.info("Tran '" + matchId + "' vua duoc import boi 1 ket noi khac, bo qua lan nay");
+                sendResponse(out, "OK_DUPLICATE");
             } catch (Exception dbEx) {
                 // CSV da an toan tren dia - loi DB khong lam mat du lieu goc,
                 // co the viet them 1 job quet lai cac file loi de import lai sau
